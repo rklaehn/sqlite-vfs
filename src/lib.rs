@@ -13,7 +13,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-use libsqlite3_sys as ffi;
+pub use libsqlite3_sys as ffi;
 
 pub type VfsError = i32;
 pub type VfsResult<T> = std::result::Result<T, VfsError>;
@@ -71,6 +71,39 @@ pub trait File {
     }
 }
 
+/// Allow boxing files, so you can easily return different optimized impls depending on OpenKind
+///
+/// E.g. you might want to return different impls for journals and main files
+impl File for Box<dyn File> {
+    fn sector_size(&self) -> usize {
+        self.as_ref().sector_size()
+    }
+
+    fn device_characteristics(&self) -> i32 {
+        self.as_ref().device_characteristics()
+    }
+
+    fn file_size(&self) -> VfsResult<u64> {
+        self.as_ref().file_size()
+    }
+
+    fn truncate(&mut self, size: u64) -> VfsResult<()> {
+        self.as_mut().truncate(size)
+    }
+
+    fn write(&mut self, pos: u64, buf: &[u8]) -> VfsResult<usize> {
+        self.as_mut().write(pos, buf)
+    }
+
+    fn read(&mut self, pos: u64, buf: &mut [u8]) -> VfsResult<usize> {
+        self.as_mut().read(pos, buf)
+    }
+
+    fn sync(&mut self) -> VfsResult<()> {
+        self.as_mut().sync()
+    }
+}
+
 /// A sqlite vfs
 ///
 /// See https://sqlite.org/c3ref/vfs.html
@@ -96,6 +129,7 @@ pub trait Vfs {
     /// Check access to `path`. The default implementation always returns `true`.
     ///
     /// int (*xAccess)(sqlite3_vfs*, const char *zName, int flags, int *pResOut);
+    #[allow(unused_variables)]
     fn access(&mut self, path: &CStr, write: bool) -> VfsResult<bool> {
         Ok(true)
     }

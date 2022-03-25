@@ -1,10 +1,7 @@
-use std::{
-    collections::BTreeMap,
-    ffi::{CStr, CString},
-};
+use std::{collections::BTreeMap, ffi::CStr};
 
 use log::info;
-use sqlite_vfs::{OpenKind, OpenOptions, Vfs, VfsResult, SQLITE_IOERR};
+use sqlite_vfs::{OpenOptions, Vfs, VfsResult, SQLITE_IOERR};
 
 struct MemVfs {
     files: BTreeMap<String, bool>,
@@ -91,6 +88,23 @@ impl sqlite_vfs::File for MemFile {
     fn sector_size(&self) -> usize {
         1024
     }
+
+    fn device_characteristics(&self) -> i32 {
+        // // writes of any size are atomic
+        // ffi::SQLITE_IOCAP_ATOMIC |
+        // // after reboot following a crash or power loss, the only bytes in a file that were written
+        // // at the application level might have changed and that adjacent bytes, even bytes within
+        // // the same sector are guaranteed to be unchanged
+        // ffi::SQLITE_IOCAP_POWERSAFE_OVERWRITE |
+        // // when data is appended to a file, the data is appended first then the size of the file is
+        // // extended, never the other way around
+        // ffi::SQLITE_IOCAP_SAFE_APPEND |
+        // // information is written to disk in the same order as calls to xWrite()
+        // ffi::SQLITE_IOCAP_SEQUENTIAL
+
+        // shittiest file system evar...
+        0
+    }
 }
 
 impl Vfs for MemVfs {
@@ -161,7 +175,7 @@ fn main() -> anyhow::Result<()> {
         [],
     )?;
 
-    for i in 0..1000 {
+    for _ in 0..2 {
         conn.execute("INSERT INTO vals (val) VALUES ('test')", [])?;
     }
 
